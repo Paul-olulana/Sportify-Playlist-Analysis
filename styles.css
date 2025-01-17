@@ -1,0 +1,14 @@
+/* Change the text color of the tab headers */
+.nav-tabs > li > a {
+    color: #007BFF; /* Replace with your preferred color (e.g., red, blue) */
+}
+
+/* Change the text color of the active tab */
+.nav-tabs > li.active > a {
+    color: #FF5733; /* Replace with your preferred active color */
+}
+
+/* Optional: Hover effect */
+.nav-tabs > li > a:hover {
+    color: #28A745; /* Replace with hover color */
+}

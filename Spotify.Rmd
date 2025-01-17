@@ -1,0 +1,320 @@
+---
+title: "**Spotify Data Analysis (2010-2023)**"
+author: "*Paul Olulana & Deborah Osilade*"
+output: 
+  html_document:
+    css: "styles.css"
+params:
+  popularity: 50
+  year: 2015
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Libraries, message=FALSE, warning=FALSE,echo=FALSE,include=FALSE}
+library(readr)
+library(tidyverse)
+library(ggplot2)
+library(forcats) # to sort charts asc to desc vice versa
+library(stringr)# to remove unwanted characters from columns - regex will be used too
+library(ggrepel)
+library(kableExtra)
+library(RColorBrewer)
+library(plotly)
+library(scales)
+setwd("~/R projects_bsb/Spotify Playlist_Anslysis")
+```
+
+## **Introduction**
+
+This report explores Spotify data from 2010 to 2023, focusing on trends in music genres, artist performance, and track attributes. Using data visualization techniques, we uncover key insights into Spotify's music landscape, highlighting popular genres, artists, and track characteristics.
+
+
+# **Data Overview** {.tabset}
+
+The dataset contains information on tracks from Spotify between 2010 and 2023. It includes variables such as:
+- **Genres**: The primary genre(s) of each artist.
+- **Popularity**: A numeric measure of track popularity.
+- **Danceability**: A score reflecting how suitable a track is for dancing.
+- **Energy**: A measure of the track's intensity and activity.
+
+
+```{r Load_data, echo=FALSE, message=FALSE, warning=FALSE,include=FALSE}
+# Load the dataset
+spotify_data <- read_csv("playlist_2010to2023.csv")
+
+# Preview the dataset
+head(spotify_data)
+
+# Check structure
+str(spotify_data)
+
+```
+
+## Data Cleaning
+
+The dataset was cleaned by renaming variables for clarity and filtering tracks with a popularity score above 50 to focus on significant records.
+
+```{r Data_cleaning, echo=FALSE, message=FALSE, warning=FALSE}
+# Rename columns
+spotify_data <- spotify_data %>%
+  rename(
+    genre= "artist_genres",  
+    popularity= "artist_popularity"
+  ) # renamed artist_genres to genre, renamed artist_popularity to popularity
+```
+
+
+```{r fixed_encoding_issues, echo=FALSE, message=FALSE, warning=FALSE}
+# Fix encoding issues in artist_name and remove invalid entries
+spotify_data <- spotify_data %>%
+  filter(popularity > params$popularity) %>%                # Filter tracks with popularity > 50
+  mutate(                                   
+    artist_name = iconv(artist_name, from = "latin1", to = "UTF-8")
+  ) %>%
+  filter(!is.na(artist_name) & artist_name != "")  # Remove rows with missing or blank artist names
+
+```
+
+
+```{r top_genre, echo=FALSE, message=FALSE, warning=FALSE}
+#to answer the question top artist genres in spotify 
+
+spotify_data$genre <- str_replace_all(spotify_data$genre, "[\\[\\]'']", "")  
+spotify_data$genre_list <- str_split(spotify_data$genre, ", ")
+all_genres <- unlist(spotify_data$genre_list)
+genre_counts <- sort(table(all_genres), decreasing = TRUE)
+genre_df <- as.data.frame(genre_counts) #sets clean column as a data frame 
+colnames(genre_df) <- c("Genre", "Count") #returns name of genre and no of times it occurs 
+```
+
+
+## **Visualizations** 
+
+### **1. Top Genres in spotify**
+
+The visualization below highlights the Top Genres on Spotify based on the number of tracks associated with each genre. This analysis provides a clear overview of the most prevalent musical styles on the platform, showcasing listener preferences and industry trends from 2010 to 2023.
+
+```{r top_10_genre, echo=FALSE, message=FALSE, warning=FALSE}
+genres_df <- head(genre_df, 10) #extracts the top 10 
+ggplot(genres_df, aes(x = reorder(Genre, Count), y = Count)) +
+  geom_bar(stat = "identity", fill = "#8B0A50") +
+  geom_text(aes(label = Count),
+              hjust = 1.1,
+              vjust = 0.5,
+              color = "white") +
+  coord_flip() +
+  theme(panel.background = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_text(size = 10,vjust = 0),
+        axis.ticks.x = element_blank(),
+        axis.ticks.y = element_blank())+ # Remove x-axis labels
+  labs(
+    title = "Pop is the Top Genre in Spotify ",
+    caption ="Top 10 Genres of Artists in Spotify",
+    x = "Genres",
+    y = "Number of Danceable Artists"
+  )
+```
+
+### **2. Danceability vs. Energy**
+
+This scatter plot visualizes the relationship between a track's danceability and energy levels, offering insights into how these attributes correlate. The color intensity represents popularity, with brighter hues indicating more popular tracks, highlighting listener preferences across various musical dynamics.
+
+```{r Accessing_danceability, echo=FALSE, message=FALSE, warning=FALSE}
+danceplot <-  ggplot(spotify_data, aes(x = danceability, y = energy, color = popularity)) +
+  geom_point(alpha = 0.7) +
+  scale_color_gradient(low = "grey", high = "#8B0A50") +
+  theme(panel.background = element_blank(),
+        panel.grid = element_blank(),
+        axis.line = element_line(colour = "grey50",
+                                 linewidth = 0.1),
+        axis.ticks.x = element_blank(),
+        axis.ticks.y = element_blank()) +
+  labs(
+    title = "What makes a song popular in Spotify",
+    subtitle = "Song popularity grows as the enegry of the song and dancability increases",
+    x = "Danceability",
+    y = "Energy",
+    color = "Popularity"
+  )
+# Convert ggplot to an interactive plotly chart
+dance_interactive_plot <- ggplotly(danceplot)
+
+# Display the interactive plot
+dance_interactive_plot
+```
+
+### **3. Popularity Trend Over Time**
+
+This line chart illustrates the evolution of average track popularity on Spotify over the years, providing a clear view of how listener preferences and trends have changed from 2010 to 2023. The visualization highlights key shifts in the music landscape, offering insights into the dynamics of popularity over time
+
+```{r popularity-trend, echo=FALSE, message=FALSE, warning=FALSE}
+popularity_trend <- spotify_data %>% 
+  filter(year >= params$year) %>% 
+  group_by(year) %>%
+  summarize(avg_popularity = mean(popularity, na.rm = TRUE))
+
+plot <- ggplot(popularity_trend, aes(x = year, y = avg_popularity)) +
+  geom_line(color = "grey", linewidth = 0.8) +
+  geom_point(color = "#8B0A50", size = 2) +
+  scale_x_continuous(breaks = 
+                       seq(min(popularity_trend$year), 
+                           max(popularity_trend$year), 1))+
+  theme(panel.background = element_blank(),
+        panel.grid = element_blank(),
+        axis.line = element_line(colour = "grey50",
+                                 linewidth = 0.1),
+        axis.ticks.x = element_blank(),
+        axis.ticks.y = element_blank()) +
+  
+  labs(
+    title = "Popularity Trend from 2015 to 2023",
+    x = "Year",
+    y = "Average Popularity"
+  )
+
+# Convert ggplot to an interactive plotly chart
+interactive_plot <- ggplotly(plot)
+
+# Display the interactive plot
+interactive_plot
+```
+
+### **4. Top 10 Most Popular Artists**
+
+The heatmap below showcases the Top 10 Most Popular Artists on Spotify from 2010 to 2023, based on their cumulative popularity scores. Each row represents an artist, with the color intensity reflecting their total popularity. Darker shades indicate higher popularity, offering a visually intuitive way to compare the relative impact of these artists in shaping Spotify's music landscape
+
+
+```{r top-artists, echo=FALSE, message=FALSE, warning=FALSE}
+# Compute artist popularity
+artist_popularity <- spotify_data %>%
+  group_by(artist_name) %>% 
+  summarize(total_popularity = sum(popularity, na.rm = TRUE)) %>%
+  arrange(desc(total_popularity))  # Order by total popularity
+
+# Select the top 10 artists
+top_10_artists <- artist_popularity %>% 
+  slice_head(n = 10)  # Select the top 10 artists
+
+# Create the heatmap
+ggplot(top_10_artists, aes(x = "", y = reorder(artist_name, total_popularity), fill = total_popularity)) +
+  geom_tile(color = "white") +  # Create the heatmap tiles
+  scale_fill_gradient(low = "pink", high = "#8B0A50", name = "Total Popularity") +  # Gradient for popularity
+  theme_minimal() +
+  theme(
+    panel.grid = element_blank(),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    legend.position = "right"
+  ) +
+  labs(
+    title = "Top 10 Most Popular Artists (Heatmap)",
+    y = "Artist",
+    fill = "Total Popularity"
+  )
+
+```
+
+
+### **5. Artist Popularity vs. Total Songs**
+
+ Artist Popularity vs. Total Songs
+
+This bubble chart compares the total number of songs released by Spotify's top artists to their cumulative popularity, offering a unique perspective on their overall impact. The size of each bubble represents the artist's average popularity, providing an intuitive way to assess the balance between quantity and quality in their discographies.
+
+```{r artist-popularity-total-songs, echo=FALSE, message=FALSE, warning=FALSE}
+# Aggregate artist stats
+artist_stats <- spotify_data %>%
+  group_by(artist_name) %>%
+  summarize(
+    total_songs = n(),  # Total number of songs
+    total_popularity = sum(popularity, na.rm = TRUE),  # Total popularity
+    avg_popularity = mean(popularity, na.rm = TRUE)  # Average popularity
+  ) %>%
+  arrange(desc(total_popularity))
+
+# Select top 10 artists
+top_10_artists <- artist_stats %>%
+  slice_head(n = 10)  # Select top 10 rows
+
+# Plot: Artist Popularity vs. Total Songs
+ggplot(top_10_artists, aes(x = total_songs, y = total_popularity, size = avg_popularity, label = artist_name)) +
+  geom_point(alpha = 0.7, color = "blue") +  # Bubble chart
+  geom_text_repel(size = 4, box.padding = 0.3, max.overlaps = Inf) +  # Adjust text labels dynamically
+  theme_minimal() +
+  labs(
+    title = "Artist Popularity vs. Total Songs (Top 10 Artists)",
+    x = "Total Number of Songs",
+    y = "Total Popularity",
+    size = "Average Popularity"
+  )
+
+```
+
+Top 10 Artists by Average Popularity
+
+The table below highlights the **Top 10 Artists** on Spotify based on their **average popularity scores**, showcasing their success and influence on the platform.
+
+## Key Highlights
+
+1. **Taylor Swift and Drake Dominate**:
+   - Taylor Swift tops the list with an average popularity score of **100** across **34 songs**, reflecting unmatched consistency.
+   - Drake closely follows with a **96 average popularity**, also across **34 tracks**, emphasizing his widespread appeal.
+
+2. **Emerging Artists**:
+   - **Bad Bunny** and **The Weeknd** achieve an impressive **95 average popularity**, even with fewer tracks, showcasing their ability to consistently release hit songs.
+
+3. **Diverse Profiles and Genres**:
+   - Artists like **Future** (4 songs) and **Travis Scott** (9 songs) achieve high popularity, demonstrating the impact of quality over quantity.
+   - The list spans various genres, including pop, rap, R&B, and hip-hop, reflecting Spotify's broad audience preferences.
+
+
+
+```{r top-genres-table, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+# Compute artist statistics
+artist_popularity <- spotify_data %>%
+  group_by(artist_name) %>%
+  summarize(
+    total_songs = n(),
+    total_popularity = sum(popularity, na.rm = TRUE),
+    avg_popularity = mean(popularity, na.rm = TRUE)
+  ) %>%
+  arrange(desc(avg_popularity)) %>%
+  slice_head(n = 10) %>%  # Select the top 10 artists
+  mutate(
+    avg_popularity = round(avg_popularity, 1),  # Round average popularity
+    total_popularity = round(total_popularity, 0)  # Round total popularity
+  )
+
+# Generate the table
+artist_popularity %>%
+  kable("html", caption = "Top 10 Artists by Average Popularity") %>%
+  kable_styling(full_width = F, bootstrap_options = c("striped", "hover")) %>%
+  column_spec(1, bold = TRUE, width = "30%") %>%  # Bold artist names
+  column_spec(2:4, width = "20%") %>% 
+  column_spec(4,background = spec_color(artist_popularity$avg_popularity[1:10],
+                      end = 0.7,direction = -1,option = "D"))# Adjust column widths
+
+```
+
+
+---
+
+## **Conclusions**
+
+This analysis uncovers key trends in Spotify data, offering valuable insights into the platform's music landscape:
+
+* Genre Dominance: Genres such as pop continue to dominate Spotify, reflecting widespread listener preferences.
+
+* Artist Consistency: Artists like Taylor Swift and Drake consistently lead in popularity, showcasing their enduring appeal and influence.
+
+* Track Attributes: Songs with high energy and danceability are more likely to achieve significant popularity, highlighting the importance of these attributes in audience engagement.
+
+> Future Directions: Further studies could examine the influence of regional preferences, exploring how cultural and geographic factors shape these trends.
+
