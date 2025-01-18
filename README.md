@@ -54,7 +54,7 @@ install.packages(c("ggplot2", "dplyr", "tidyr", "knitr", "rmarkdown"))
 
 ### Clone the Repository
 ```bash
-git clone https://github.com/username/Spotify-Playlist-Analysis.git
+git clone https://github.com/Paul-olulana/Spotify-Playlist-Analysis.git
 cd Spotify-Playlist-Analysis
 ```
 
